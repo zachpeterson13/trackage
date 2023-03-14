@@ -12,9 +12,9 @@
 
 %% API
 -export([start/3, stop/1, store/3]).
+
 %% gen_server callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
-         code_change/3]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 %%%===================================================================
 %%% API
@@ -83,7 +83,8 @@ init([]) ->
 handle_call(stop, _From, _State) ->
    %% setting the server's internal state to down
   {stop, normal, replace_stopped, down};
-handle_call({store, Package_uuid, Holder_uuid, Timestamp}, _From, Riak_pid) ->
+
+handle_call({store, Key, Values}, _From, Riak_pid) ->
   {reply, ok, Riak_pid}.
 
 %%--------------------------------------------------------------------
@@ -145,37 +146,67 @@ code_change(_OldVsn, State, _Extra) ->
 
 -include_lib("eunit/include/eunit.hrl").
 setup() ->
-  ?debugMsg("setup"),
-  {ok, Pid} = gen_server:start({local, tster}, ?MODULE, [], []),
-  meck:new(riakc_pb_socket, [passthrough]),
-  meck:expect(riakc_pb_socket, start_link, fun(_, _) -> [] end),
-  meck:expect(riakc_pb_socket, put, fun(State, Request) -> [Request | State] end),
+  {ok, Pid} = gen_server:start(?MODULE, [], []),
   Pid.
 
 cleanup(Pid) ->
-  ?debugMsg("cleanup"),
   gen_server:stop(Pid),
-  meck:unload(),
   ?assertEqual(false, is_process_alive(Pid)).
 
 server_is_alive(Pid) ->
-  [
-   ?_assertEqual(true, is_process_alive(Pid))
-  ].
-
-server_attempts_store_riakc_obj(Pid) ->
-  store_package_server:store(Pid,"P001", "H001", 2_000),
-  ?assert(meck:validate(riakc_pb_socket)),
-  ExpectedObj = riakc_obj:new(<<"package">>, term_to_binary("P001"), term_to_binary(#{holder_uuid => "H001", timestamp => 2000})),
-  Test1 = ?_assertEqual([ExpectedObj], sys:get_state(Pid)),
+  Test1 =  {"" , ?_assertEqual(true, is_process_alive(Pid))},
 
   [Test1].
+
+store_happy_path(Pid) ->
+  Actual = store_package_server:store(Pid, "key1", [{"val1", "val2"}]),
+
+  Test1 = {"" , ?_assertEqual(ok, Actual)},
+
+  [Test1].
+
+store_invalid_name(_Pid) ->
+  Expected = {error, "Invalid gen_server name."},
+  
+  Test1 = 
+    try store_package_server:store(invalid_name, "key", [{"val", "val"}]) of
+      Actual -> {"store should return an error tuple if the gen_server does not exist", ?_assertEqual(Expected, Actual)}
+    catch
+      exit:_Exit -> {"store should catch noproc exceptions", ?_assert(false)}
+    end,
+
+  [Test1].
+
+store_invalid_key(Pid) ->
+  Expected = {error, "Key must be a string."},
+
+  Actual1 = store_package_server:store(Pid, not_a_string, [{"val", "val"}]),
+
+  Test1 = {"store returns error tuple if an atom is given for the key", ?_assertEqual(Expected, Actual1)},
+
+  [Test1].
+
+store_invalid_value(Pid) ->
+  Expected = {error, "Value must be a list of 2-tuples."},
+
+  Actual1 = store_package_server:store(Pid, "", []),
+  Actual2 = store_package_server:store(Pid, "", not_a_list),
+  Actual3 = store_package_server:store(Pid, "", [1,2,3,4]),
+
+  Test1 = {"" , ?_assertEqual(Expected, Actual1)},
+  Test2 = {"" , ?_assertEqual(Expected, Actual2)},
+  Test3 = {"" , ?_assertEqual(Expected, Actual3)},
+
+  [Test1, Test2, Test3].
 
 store_package_server_test_() ->
   {foreach, fun setup/0, fun cleanup/1,
    [
     fun server_is_alive/1,
-    fun server_attempts_store_riakc_obj/1
+    fun store_happy_path/1,
+    fun store_invalid_name/1,
+    fun store_invalid_key/1,
+    fun store_invalid_value/1
    ]
   }.
 -endif.
