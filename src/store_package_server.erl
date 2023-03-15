@@ -83,7 +83,7 @@ init([]) ->
 handle_call(stop, _From, _State) ->
   {stop, normal, replace_stopped, down}; %% setting the server's internal state to down
 handle_call({store, _Key, _Values}, _From, Riak_pid) ->
-  {reply, ok, Riak_pid}.
+  {reply, stub, Riak_pid}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -167,9 +167,11 @@ setup() ->
   meck:expect(riakc_pb_socket,
               put,
               fun (fake_pid, error) ->
-                    {error, error_info};
+                    {error, error_simulated};
+                  (fake_pid, ok) ->
+                    ok;
                   (fake_pid, _) ->
-                    ok
+                    {error, not_a_riakc_obj}
               end),
   {ok, Pid} = gen_server:start(?MODULE, [], []),
 
