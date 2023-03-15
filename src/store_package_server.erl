@@ -145,10 +145,7 @@ code_change(_OldVsn, State, _Extra) ->
 -include_lib("eunit/include/eunit.hrl").
 
 store_package_server_test_() ->
-  {setup,
-   fun setup/0,
-   fun cleanup/1,
-   fun instantiator/1}.
+  {setup, fun setup/0, fun cleanup/1, fun instantiator/1}.
 
 setup() ->
   % mock riakc_obj:new so we can test the case of put returning an error.
@@ -156,9 +153,9 @@ setup() ->
   meck:expect(riakc_obj,
               new,
               fun (_, _, error) ->
-                  error;
+                    error;
                   (_, _, _) ->
-                  ok
+                    ok
               end),
 
   % mock riakc_pb_socket:start_link and riakc_pb_socket:put to simulate put error.
@@ -167,11 +164,13 @@ setup() ->
   meck:expect(riakc_pb_socket,
               put,
               fun (fake_pid, error) ->
-                    {error, error_simulated};
+                    {error, "error_simulated"};
                   (fake_pid, ok) ->
                     ok;
                   (fake_pid, _) ->
-                    {error, not_a_riakc_obj}
+                    {error, "not a riakc_obj"};
+                  (_, _) ->
+                    {error, "put called without first creating link to db server"}
               end),
   {ok, Pid} = gen_server:start(?MODULE, [], []),
 
@@ -183,14 +182,12 @@ cleanup(Pid) ->
   ?assertEqual(false, is_process_alive(Pid)).
 
 instantiator(Pid) ->
-  [
-   server_is_alive(Pid),
+  [server_is_alive(Pid),
    store_happy_path(Pid),
    store_invalid_name(Pid),
    store_invalid_key(Pid),
    store_invalid_value(Pid),
-   store_put_error(Pid)
-  ].
+   store_put_error(Pid)].
 
 server_is_alive(Pid) ->
   Test1 =
@@ -200,12 +197,13 @@ server_is_alive(Pid) ->
   [Test1].
 
 store_happy_path(Pid) ->
-  Expected1 = ok,
-
-  Actual1 = store_package_server:store(Pid, "key1", [{"val1", "val2"}]),
-
   Test1 =
-    {"store works as expected when given good args", ?_assertEqual(Expected1, Actual1)},
+    case store_package_server:store(Pid, "key1", [{"val1", "val2"}]) of
+      {error, Error} ->
+        {Error, ?_assert(false)};
+      Actual1 ->
+        {"store works as expected when given good args", ?_assertEqual(ok, Actual1)}
+    end,
 
   [Test1].
 
@@ -259,6 +257,5 @@ store_put_error(Pid) ->
      ?_assertEqual(Expected, Actual1)},
 
   [Test1].
-
 
 -endif.
