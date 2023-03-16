@@ -6,7 +6,7 @@
 %%        Creative Commons Attribution 4.0 International License</a>
 %%
 %%
--module(store_package_server).
+-module(store_package).
 
 -behaviour(gen_server).
 
@@ -173,7 +173,7 @@ setup() ->
                     {error, "put called without first creating link to db server"}
               end),
   {ok, Pid} = gen_server:start(?MODULE, [], []),
-
+  ?assert(is_process_alive(Pid)),
   Pid.
 
 cleanup(Pid) ->
@@ -182,19 +182,19 @@ cleanup(Pid) ->
   ?assertEqual(false, is_process_alive(Pid)).
 
 instantiator(Pid) ->
-  [server_is_alive(Pid),
-   store_happy_path(Pid),
+  % [server_is_alive(Pid),
+  [store_happy_path(Pid),
    store_invalid_name(Pid),
    store_invalid_key(Pid),
    store_invalid_value(Pid),
    store_put_error(Pid)].
 
-server_is_alive(Pid) ->
-  Test1 =
-    {"server starts when start or start_link is called",
-     ?_assertEqual(true, is_process_alive(Pid))},
+% server_is_alive(Pid) ->
+%   Test1 =
+%     {"server starts when start or start_link is called",
+%      ?_assertEqual(true, is_process_alive(Pid))},
 
-  [Test1].
+%   [Test1].
 
 store_happy_path(Pid) ->
   Test1 =
@@ -240,12 +240,14 @@ store_invalid_value(Pid) ->
   Actual1 = store_package_server:store(Pid, "", []),
   Actual2 = store_package_server:store(Pid, "", not_a_list),
   Actual3 = store_package_server:store(Pid, "", [1, 2, 3, 4]),
+  Actual4 = store_package_server:store(Pid, "", [{1, 2, 3}]),
 
   Test1 = {"Value cannot be an empty list", ?_assertEqual(Expected, Actual1)},
   Test2 = {"Value must be a list of 2-tuples", ?_assertEqual(Expected, Actual2)},
   Test3 = {"Value must be a list of 2-tuples", ?_assertEqual(Expected, Actual3)},
+  Test4 = {"Value must be a list of 2-tuples", ?_assertEqual(Expected, Actual4)},
 
-  [Test1, Test2, Test3].
+  [Test1, Test2, Test3, Test4].
 
 store_put_error(Pid) ->
   Expected = {error, error_info},
