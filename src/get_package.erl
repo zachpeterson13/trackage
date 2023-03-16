@@ -1,11 +1,7 @@
-%% @author Lee Barney
-%% @copyright 2022 Lee Barney licensed under the <a>
-%%        rel="license"
-%%        href="http://creativecommons.org/licenses/by/4.0/"
-%%        target="_blank">
-%%        Creative Commons Attribution 4.0 International License</a>
-%%
-%%
+%%%=============================================================================
+%%% @doc get_package
+%%% @end
+%%%=============================================================================
 -module(get_package).
 
 -behaviour(gen_server).
@@ -138,22 +134,60 @@ code_change(_OldVsn, State, _Extra) ->
 
 -include_lib("eunit/include/eunit.hrl").
 
-get_package_test_() ->
+get_test_() ->
   {setup, fun setup/0, fun cleanup/1, fun instantiator/1}.
 
 setup() ->
+  % mock riakc_pb_socket:start_link
+  meck:new(riakc_pb_socket, [passthrough]),
+  meck:expect(riakc_pb_socket, start_link, fun(_, _) -> {ok, fake_pid} end),
   {ok, Pid} = gen_server:start(?MODULE, [], []),
   ?assert(is_process_alive(Pid)),
   Pid.
 
 cleanup(Pid) ->
   gen_server:stop(Pid),
+  meck:unload(),
   ?assertEqual(false, is_process_alive(Pid)).
 
 instantiator(Pid) ->
-  [temp()].
+  [get_happy_path(Pid), get_invalid_key(Pid), get_fetch_error(Pid)].
 
-temp() ->
-  [?_assert(false)].
+get_happy_path(Pid) ->
+  meck:expect(riakc_pb_socket, get, fun(_, _, _) -> {ok, ok} end),
+  meck:expect(riakc_obj,
+              get_value,
+              fun(_) ->
+                 <<131, 108, 0, 0, 0, 1, 104, 2, 107, 0, 9, 104, 111, 108, 100, 101, 114, 32, 105,
+                   100, 98, 0, 53, 56, 179, 106>>
+              end),
+
+  Actual1 = get_package:get(Pid, "good key"),
+  Test1 = ?_assert(is_list(Actual1)),
+  Test2 = ?_assertEqual([{"holder id",3487923}], Actual1),
+
+  meck:delete(riakc_pb_socket, get, 3),
+  meck:delete(riakc_obj, get_value, 1),
+
+  [Test1, Test2].
+
+get_invalid_key(Pid) ->
+  Expected = {error, "Key must be a string"},
+  Actual1 = get_package:get(Pid, not_a_string),
+  Test1 = ?_assertEqual(Expected, Actual1),
+  [Test1].
+
+get_fetch_error(Pid) ->
+  meck:expect(riakc_pb_socket, get, fun(_, _, _) -> {error, "Error message"} end),
+
+  Expected = {error, "Error message"},
+  Actual1 = get_package:get(Pid, ""),
+  Test1 =
+    {"Handle case if riakc_pb_socket:get returns an error.",
+     ?_assertEqual(Expected, Actual1)},
+
+  meck:delete(riakc_pb_socket, get, 3),
+
+  [Test1].
 
 -endif.
