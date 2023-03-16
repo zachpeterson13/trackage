@@ -198,7 +198,7 @@ instantiator(Pid) ->
 
 store_happy_path(Pid) ->
   Test1 =
-    case store_package_server:store(Pid, "key1", [{"val1", "val2"}]) of
+    case store_package:store(Pid, "key1", [{"val1", "val2"}]) of
       {error, Error} ->
         {Error, ?_assert(false)};
       Actual1 ->
@@ -211,7 +211,7 @@ store_invalid_name(_Pid) ->
   Expected = {error, "Invalid gen_server name."},
 
   Test1 =
-    try store_package_server:store(invalid_name, "key", [{"val", "val"}]) of
+    try store_package:store(invalid_name, "key", [{"val", "val"}]) of
       Actual ->
         {"store should return an error tuple if the gen_server does not "
          "exist",
@@ -226,7 +226,7 @@ store_invalid_name(_Pid) ->
 store_invalid_key(Pid) ->
   Expected = {error, "Key must be a string."},
 
-  Actual1 = store_package_server:store(Pid, not_a_string, [{"val", "val"}]),
+  Actual1 = store_package:store(Pid, not_a_string, [{"val", "val"}]),
 
   Test1 =
     {"store returns error tuple if an atom is given for the key",
@@ -237,10 +237,10 @@ store_invalid_key(Pid) ->
 store_invalid_value(Pid) ->
   Expected = {error, "Value must be a list of 2-tuples."},
 
-  Actual1 = store_package_server:store(Pid, "", []),
-  Actual2 = store_package_server:store(Pid, "", not_a_list),
-  Actual3 = store_package_server:store(Pid, "", [1, 2, 3, 4]),
-  Actual4 = store_package_server:store(Pid, "", [{1, 2, 3}]),
+  Actual1 = store_package:store(Pid, "", []),
+  Actual2 = store_package:store(Pid, "", not_a_list),
+  Actual3 = store_package:store(Pid, "", [1, 2, 3, 4]),
+  Actual4 = store_package:store(Pid, "", [{1, 2, 3}]),
 
   Test1 = {"Value cannot be an empty list", ?_assertEqual(Expected, Actual1)},
   Test2 = {"Value must be a list of 2-tuples", ?_assertEqual(Expected, Actual2)},
@@ -252,7 +252,7 @@ store_invalid_value(Pid) ->
 store_put_error(Pid) ->
   Expected = {error, error_info},
 
-  Actual1 = store_package_server:store(Pid, "", error),
+  Actual1 = store_package:store(Pid, "", error),
 
   Test1 =
     {"handle case where riakc_pb_socket:put returns an error",
