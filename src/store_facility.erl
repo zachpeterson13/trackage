@@ -1,9 +1,8 @@
 %%%=============================================================================
-%%% @doc store_package
+%%% @doc store_facility
 %%% @end
 %%%=============================================================================
--module(store_package).
-
+-module(store_facility).
 -behaviour(gen_server).
 
 %% API
@@ -39,7 +38,7 @@ stop(Name) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Stores package info.
+%% Stores vehicle info.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -164,7 +163,7 @@ instantiator(Pid) ->
 store_happy_path(Pid) ->
   meck:expect(riakc_pb_socket, put, fun(_, _) -> ok end),
 
-  Actual1 = store_package:store(Pid, "key1", [{"val1", "val2"}]),
+  Actual1 = store_package:store(Pid, "key1", "city"),
   Test1 = ?_assertEqual(ok, Actual1),
 
   meck:delete(riakc_pb_socket, put, 2),
@@ -174,7 +173,7 @@ store_happy_path(Pid) ->
 store_invalid_key(Pid) ->
   Expected = {error, "Key must be a string."},
 
-  Actual1 = store_package:store(Pid, not_a_string, [{"val", "val"}]),
+  Actual1 = store_package:store(Pid, not_a_string, "city"),
 
   Test1 =
     {"store returns error tuple if an atom is given for the key",
@@ -183,10 +182,10 @@ store_invalid_key(Pid) ->
   [Test1].
 
 store_invalid_value(Pid) ->
-  Expected = {error, "Value must be a list of 2-tuples."},
+  Expected = {error, "Value must be a string"},
 
   Actual1 = store_package:store(Pid, "", []),
-  Actual2 = store_package:store(Pid, "", not_a_list),
+  Actual2 = store_package:store(Pid, "", not_a_string),
   Actual3 = store_package:store(Pid, "", [1, 2, 3, 4]),
   Actual4 = store_package:store(Pid, "", [{1, 2, 3}]),
 

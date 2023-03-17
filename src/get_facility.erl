@@ -1,13 +1,12 @@
 %%%=============================================================================
-%%% @doc store_package
+%%% @doc get_facility
 %%% @end
 %%%=============================================================================
--module(store_package).
-
+-module(get_facility).
 -behaviour(gen_server).
 
 %% API
--export([start/3, stop/1, store/3]).
+-export([start/3, stop/1, get/2]).
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
          code_change/3]).
@@ -18,8 +17,12 @@
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Start the server with the given Registration_type, Name, and Args
-%% Registration_type can be `local` or `global`
+%% Starts a server using this module and registers the server using
+%% the name given.
+%% Registration_type can be local or global.
+%%
+%% Args is a list containing any data to be passed to the gen_server's
+%% init function.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -29,7 +32,7 @@ start(Registration_type, Name, Args) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Stop the server gracefully.
+%% Stops the server gracefully
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -37,15 +40,8 @@ start(Registration_type, Name, Args) ->
 stop(Name) ->
   gen_server:call(Name, stop).
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Stores package info.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec store(Name :: atom(), Key :: binary(), Value :: binary()) -> term().
-store(Name, Key, Value) ->
-  gen_server:call(Name, {store, Key, Value}).
+get(Name, Facility_uuid) ->
+  gen_server:call(Name, {get, Facility_uuid}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -60,7 +56,7 @@ store(Name, Key, Value) ->
 %%--------------------------------------------------------------------
 -spec init(term()) -> {ok, term()} | {ok, term(), number()} | ignore | {stop, term()}.
 init([]) ->
-  {ok, replace_with_riak_pid}.
+  {ok, replace_up}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -78,12 +74,11 @@ init([]) ->
                    {stop, term(), term()}.
 handle_call(stop, _From, _State) ->
   {stop, normal, replace_stopped, down}; %% setting the server's internal state to down
-handle_call({store, _Key, _Values}, _From, Riak_pid) ->
+handle_call({get, _Key}, _From, Riak_pid) ->
   {reply, stub, Riak_pid}.
 
 %%--------------------------------------------------------------------
 %% @private
-
 %% @doc
 %% Handling cast messages
 %%
@@ -100,8 +95,6 @@ handle_cast(_Msg, State) ->
 %% Handling all non call/cast messages
 %%
 %% @end
-%%--------------------------------------------------------------------
-
 -spec handle_info(Info :: term(), State :: term()) ->
                    {noreply, term()} | {noreply, term(), integer()} | {stop, term(), term()}.
 handle_info(_Info, State) ->
@@ -140,10 +133,11 @@ code_change(_OldVsn, State, _Extra) ->
 
 -include_lib("eunit/include/eunit.hrl").
 
-store_test_() ->
+get_test_() ->
   {setup, fun setup/0, fun cleanup/1, fun instantiator/1}.
 
 setup() ->
+  % mock riakc_pb_socket:start_link
   meck:new(riakc_pb_socket, [passthrough]),
   meck:expect(riakc_pb_socket, start_link, fun(_, _) -> {ok, fake_pid} end),
   {ok, Pid} = gen_server:start(?MODULE, [], []),
@@ -156,57 +150,40 @@ cleanup(Pid) ->
   ?assertEqual(false, is_process_alive(Pid)).
 
 instantiator(Pid) ->
-  [store_happy_path(Pid),
-   store_invalid_key(Pid),
-   store_invalid_value(Pid),
-   store_put_error(Pid)].
+  [get_happy_path(Pid), get_invalid_key(Pid), get_fetch_error(Pid)].
 
-store_happy_path(Pid) ->
-  meck:expect(riakc_pb_socket, put, fun(_, _) -> ok end),
+get_happy_path(Pid) ->
+  meck:expect(riakc_pb_socket, get, fun(_, _, _) -> {ok, ok} end),
+  meck:expect(riakc_obj,
+              get_value,
+              fun(_) ->
+                  <<131,107,0,13,78,101,119,32,89,111,114,107,32,67,105,116,121>>
+              end),
 
-  Actual1 = store_package:store(Pid, "key1", [{"val1", "val2"}]),
-  Test1 = ?_assertEqual(ok, Actual1),
+  Actual1 = get_facility:get(Pid, "good key"),
+  Test1 = ?_assertEqual("New York City", Actual1),
 
-  meck:delete(riakc_pb_socket, put, 2),
-
-  [Test1].
-
-store_invalid_key(Pid) ->
-  Expected = {error, "Key must be a string."},
-
-  Actual1 = store_package:store(Pid, not_a_string, [{"val", "val"}]),
-
-  Test1 =
-    {"store returns error tuple if an atom is given for the key",
-     ?_assertEqual(Expected, Actual1)},
+  meck:delete(riakc_pb_socket, get, 3),
+  meck:delete(riakc_obj, get_value, 1),
 
   [Test1].
 
-store_invalid_value(Pid) ->
-  Expected = {error, "Value must be a list of 2-tuples."},
+get_invalid_key(Pid) ->
+  Expected = {error, "Key must be a string"},
+  Actual1 = get_facility:get(Pid, not_a_string),
+  Test1 = ?_assertEqual(Expected, Actual1),
+  [Test1].
 
-  Actual1 = store_package:store(Pid, "", []),
-  Actual2 = store_package:store(Pid, "", not_a_list),
-  Actual3 = store_package:store(Pid, "", [1, 2, 3, 4]),
-  Actual4 = store_package:store(Pid, "", [{1, 2, 3}]),
+get_fetch_error(Pid) ->
+  meck:expect(riakc_pb_socket, get, fun(_, _, _) -> {error, "Error message"} end),
 
-  Test1 = {"Value cannot be an empty list", ?_assertEqual(Expected, Actual1)},
-  Test2 = {"Value must be a list of 2-tuples", ?_assertEqual(Expected, Actual2)},
-  Test3 = {"Value must be a list of 2-tuples", ?_assertEqual(Expected, Actual3)},
-  Test4 = {"Value must be a list of 2-tuples", ?_assertEqual(Expected, Actual4)},
-
-  [Test1, Test2, Test3, Test4].
-
-store_put_error(Pid) ->
-  meck:expect(riakc_pb_socket, put, fun (_, _) -> {error, "error simulated"} end),
-
-  Expected = {error, "error simulated"},
-  Actual1 = store_package:store(Pid, "", ""),
+  Expected = {error, "Error message"},
+  Actual1 = get_facility:get(Pid, ""),
   Test1 =
-    {"handle case where riakc_pb_socket:put returns an error",
+    {"Handle case if riakc_pb_socket:get returns an error.",
      ?_assertEqual(Expected, Actual1)},
 
-  meck:delete(riakc_pb_socket, put, 2),
+  meck:delete(riakc_pb_socket, get, 3),
 
   [Test1].
 
