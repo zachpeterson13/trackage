@@ -43,8 +43,8 @@ stop(Name) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec store(Name :: atom(), Key :: binary(), Value :: binary()) -> term().
-store(Name, Key, Value) ->
-  gen_server:call(Name, {store, Key, Value}).
+store(_Name, _Key, _Value) ->
+  stub.
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -58,7 +58,7 @@ store(Name, Key, Value) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec init(term()) -> {ok, term()} | {ok, term(), number()} | ignore | {stop, term()}.
-init([]) ->
+init(_Args) ->
   {ok, replace_with_riak_pid}.
 
 %%--------------------------------------------------------------------
@@ -77,8 +77,8 @@ init([]) ->
                    {stop, term(), term()}.
 handle_call(stop, _From, _State) ->
   {stop, normal, replace_stopped, down}; %% setting the server's internal state to down
-handle_call({store, _Key, _Values}, _From, Riak_pid) ->
-  {reply, stub, Riak_pid}.
+handle_call({store, _Key, _Values}, _From, _Riak_pid) ->
+  {reply, stub, replace_new_state}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -139,55 +139,73 @@ code_change(_OldVsn, State, _Extra) ->
 
 -include_lib("eunit/include/eunit.hrl").
 
-store_test_() ->
+% tests for the store_facility:handle_call callback for store/3.
+handle_call_store_test_() ->
   {setup, fun setup/0, fun cleanup/1, fun instantiator/1}.
 
 setup() ->
   meck:new(riakc_pb_socket, [passthrough]),
-  meck:expect(riakc_pb_socket, start_link, fun(_, _) -> {ok, fake_pid} end),
-  {ok, Pid} = gen_server:start(?MODULE, [], []),
-  ?assert(is_process_alive(Pid)),
-  Pid.
+  ok.
 
-cleanup(Pid) ->
-  gen_server:stop(Pid),
-  meck:unload(),
-  ?assertEqual(false, is_process_alive(Pid)).
+cleanup(_) ->
+  meck:unload().
 
-instantiator(Pid) ->
-  [store_happy_path(Pid),
-   store_invalid_key(Pid),
-   store_invalid_value(Pid),
-   store_put_error(Pid)].
+instantiator(_) ->
+  [
+   handle_call_store_happy(),
+   handle_call_store_put_error()
+  ].
 
-store_happy_path(Pid) ->
-  meck:expect(riakc_pb_socket, put, fun(_, _) -> ok end),
+handle_call_store_happy() ->
+  meck:expect(riakc_pb_socket, put, fun (_, _) -> ok end),
 
-  Actual1 = store_facility:store(Pid, "key1", "city"),
-  Test1 = ?_assertEqual(ok, Actual1),
+  Actual1 = store_facility:handle_call({store, "key1", "city"}, some_from_pid, some_riak_pid),
 
-  meck:delete(riakc_pb_socket, put, 2),
+  Test1 = ?_assertEqual({reply, ok, some_riak_pid}, Actual1),
 
   [Test1].
 
-store_invalid_key(Pid) ->
-  Expected = {error, "Key must be a string."},
+handle_call_store_put_error() ->
+  meck:expect(riakc_pb_socket, put, fun (_, _) -> {error, "error simulated"} end),
 
-  Actual1 = store_facility:store(Pid, not_a_string, "city"),
+  Expected = {stop, {error, "error simulated"}, down},
+
+  Actual1 = store_facility:handle_call({store, "key1", "city"}, some_from_pid, some_riak_pid),
+
+  Test1 =
+    {"handle case where riakc_pb_socket:put returns an error",
+     ?_assertEqual(Expected, Actual1)},
+
+  [Test1].
+
+% tests for the store_facility:store/3 api function.
+store_test_() ->
+  [
+   store_invalid_key(),
+   store_invalid_value()
+  ].
+
+store_invalid_key() ->
+  Expected = {error, "Key must be a non-empty string."},
+
+  Actual1 = catch store_facility:store(pid, not_a_string, "city"),
+  Actual2 = catch store_facility:store(pid, "", "city"),
 
   Test1 =
     {"store returns error tuple if an atom is given for the key",
      ?_assertEqual(Expected, Actual1)},
 
-  [Test1].
+  Test2 = ?_assertEqual(Expected, Actual2),
 
-store_invalid_value(Pid) ->
+  [Test1, Test2].
+
+store_invalid_value() ->
   Expected = {error, "Value must be a string"},
 
-  Actual1 = store_facility:store(Pid, "", []),
-  Actual2 = store_facility:store(Pid, "", not_a_string),
-  Actual3 = store_facility:store(Pid, "", [1, 2, 3, 4]),
-  Actual4 = store_facility:store(Pid, "", [{1, 2, 3}]),
+  Actual1 = catch store_facility:store(pid, "key", []),
+  Actual2 = catch store_facility:store(pid, "key", not_a_string),
+  Actual3 = catch store_facility:store(pid, "key", [1, 2, 3, 4]),
+  Actual4 = catch store_facility:store(pid, "key", [{1, 2, 3}]),
 
   Test1 = {"Value must be a string", ?_assertEqual(Expected, Actual1)},
   Test2 = {"Value must be a string", ?_assertEqual(Expected, Actual2)},
@@ -195,18 +213,5 @@ store_invalid_value(Pid) ->
   Test4 = {"Value must be a string", ?_assertEqual(Expected, Actual4)},
 
   [Test1, Test2, Test3, Test4].
-
-store_put_error(Pid) ->
-  meck:expect(riakc_pb_socket, put, fun (_, _) -> {error, "error simulated"} end),
-
-  Expected = {error, "error simulated"},
-  Actual1 = store_facility:store(Pid, "", ""),
-  Test1 =
-    {"handle case where riakc_pb_socket:put returns an error",
-     ?_assertEqual(Expected, Actual1)},
-
-  meck:delete(riakc_pb_socket, put, 2),
-
-  [Test1].
 
 -endif.
