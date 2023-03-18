@@ -160,18 +160,18 @@ handle_call_get_happy() ->
      <<131, 108, 0, 0, 0, 1, 104, 2, 107, 0, 9, 104, 111, 108, 100, 101, 114, 32, 105, 100, 98, 0, 53, 56, 179, 106>>
   end),
 
+  Expected = {reply, [{"holder id",3487923}], some_riak_pid},
+
   Actual1 = get_package:handle_call({get, "key1"}, some_from_pid, some_riak_pid),
 
-  Test1 = ?_assert(is_list(Actual1)),
-  Test2 = ?_assertEqual([{"holder id",3487923}], Actual1),
+  Test1 = ?_assertEqual(Expected, Actual1),
 
-
-  [Test1, Test2].
+  [Test1].
 
 handle_call_get_fetch_error() ->
   meck:expect(riakc_pb_socket, get, fun(_, _, _) -> {error, "Error message"} end),
 
-  Expected = {error, "Error message"},
+  Expected = {error, {error, "Error message"}, down},
 
   Actual1 = get_package:handle_call({get, "key1"}, some_from_pid, some_riak_pid),
 
