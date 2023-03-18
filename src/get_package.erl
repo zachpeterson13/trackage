@@ -134,60 +134,68 @@ code_change(_OldVsn, State, _Extra) ->
 
 -include_lib("eunit/include/eunit.hrl").
 
-get_test_() ->
+% tests for the get_package:handle_call callback for get/3.
+handle_call_get_test_() ->
   {setup, fun setup/0, fun cleanup/1, fun instantiator/1}.
 
 setup() ->
-  % mock riakc_pb_socket:start_link
   meck:new(riakc_pb_socket, [passthrough]),
-  meck:expect(riakc_pb_socket, start_link, fun(_, _) -> {ok, fake_pid} end),
-  {ok, Pid} = gen_server:start(?MODULE, [], []),
-  ?assert(is_process_alive(Pid)),
-  Pid.
+  meck:new(riakc_obj, [passthrough]),
+  ok.
 
-cleanup(Pid) ->
-  gen_server:stop(Pid),
-  meck:unload(),
-  ?assertEqual(false, is_process_alive(Pid)).
+cleanup(_) ->
+  meck:unload().
 
-instantiator(Pid) ->
-  [get_happy_path(Pid), get_invalid_key(Pid), get_fetch_error(Pid)].
+instantiator(_) ->
+  [
+   handle_call_get_happy(),
+   handle_call_get_fetch_error()
+  ].
 
-get_happy_path(Pid) ->
+handle_call_get_happy() ->
   meck:expect(riakc_pb_socket, get, fun(_, _, _) -> {ok, ok} end),
   meck:expect(riakc_obj,
-              get_value,
-              fun(_) ->
-                 <<131, 108, 0, 0, 0, 1, 104, 2, 107, 0, 9, 104, 111, 108, 100, 101, 114, 32, 105,
-                   100, 98, 0, 53, 56, 179, 106>>
-              end),
+  get_value,
+  fun(_) ->
+     <<131, 108, 0, 0, 0, 1, 104, 2, 107, 0, 9, 104, 111, 108, 100, 101, 114, 32, 105, 100, 98, 0, 53, 56, 179, 106>>
+  end),
 
-  Actual1 = get_package:get(Pid, "good key"),
+  Actual1 = get_package:handle_call({get, "key1"}, some_from_pid, some_riak_pid),
+
   Test1 = ?_assert(is_list(Actual1)),
   Test2 = ?_assertEqual([{"holder id",3487923}], Actual1),
 
-  meck:delete(riakc_pb_socket, get, 3),
-  meck:delete(riakc_obj, get_value, 1),
 
   [Test1, Test2].
 
-get_invalid_key(Pid) ->
-  Expected = {error, "Key must be a string"},
-  Actual1 = get_package:get(Pid, not_a_string),
-  Test1 = ?_assertEqual(Expected, Actual1),
-  [Test1].
-
-get_fetch_error(Pid) ->
+handle_call_get_fetch_error() ->
   meck:expect(riakc_pb_socket, get, fun(_, _, _) -> {error, "Error message"} end),
 
   Expected = {error, "Error message"},
-  Actual1 = get_package:get(Pid, ""),
+
+  Actual1 = get_package:handle_call({get, "key1"}, some_from_pid, some_riak_pid),
+
   Test1 =
     {"Handle case if riakc_pb_socket:get returns an error.",
      ?_assertEqual(Expected, Actual1)},
 
-  meck:delete(riakc_pb_socket, get, 3),
-
   [Test1].
+
+% tests for the get_package:get/2 api function.
+get_test_() ->
+  [
+   get_invalid_key()
+  ].
+
+get_invalid_key() ->
+  Expected = {error, "Key must be a non-empty string."},
+
+  Actual1 = catch get_package:get(pid, not_a_string),
+  Actual2 = catch get_package:get(pid, ""),
+
+  Test1 = ?_assertEqual(Expected, Actual1),
+  Test2 = ?_assertEqual(Expected, Actual2),
+
+  [Test1, Test2].
 
 -endif.
