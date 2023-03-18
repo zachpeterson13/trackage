@@ -7,7 +7,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start/3, stop/1, get_pid/0]).
+-export([start/3, stop/1, get/0, add/1]).
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
          code_change/3]).
@@ -43,7 +43,16 @@ stop(Name) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-get_pid() ->
+get() ->
+  ok.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% 
+%%
+%% @end
+%%--------------------------------------------------------------------
+add(_To_add) ->
   ok.
 
 %%%===================================================================
@@ -140,7 +149,7 @@ code_change(_OldVsn, State, _Extra) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-get_pid_test_() ->
+get_next_test_() ->
   Actual1 = rr_distributor:handle_call(get_next, ok, [server1, server2, server3, server4]),
   Actual2 = rr_distributor:handle_call(get_next, ok, [server2, server3, server4]),
   Actual3 = rr_distributor:handle_call(get_next, ok, [server3, server4]),
@@ -154,7 +163,7 @@ get_pid_test_() ->
 
   [Test1, Test2, Test3, Test4].
 
-add_pid_test_() ->
+add_test_() ->
   Actual1 = rr_distributor:handle_call({add, new_pid1}, from, [server1, server2, server3, server4]),
   Actual2 = rr_distributor:handle_call({add, new_pid2}, from, [new_pid1, server1, server2, server3, server4]),
   Actual3 = rr_distributor:handle_call({add, new_pid3}, from, [new_pid2, new_pid1, server1, server2, server3, server4]),
