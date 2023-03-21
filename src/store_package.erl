@@ -33,9 +33,9 @@ start(Registration_type, Name, Args) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec stop(Name :: atom()) -> {ok} | {error, term()}.
-stop(Name) ->
-  gen_server:call(Name, stop).
+-spec stop(ServerRef :: atom()) -> {ok} | {error, term()}.
+stop(ServerRef) ->
+  gen_server:call(ServerRef, stop).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -43,9 +43,15 @@ stop(Name) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec store(Name :: atom(), Key :: binary(), Value :: binary()) -> term().
-store(_Name, _Key, _Value) ->
-  stub.
+-spec store(ServerRef :: atom(), Key :: binary(), Value :: binary()) -> term().
+store(_, Key, _) when is_list(Key) == false; Key == [] ->
+  {error, "Key must be a non-empty string."};
+store(_, _, Value) when Value == []; not is_list(Value) ->
+  {error, "Value must be a list of 2-tuples."};
+store(_, _, [Head | _]) when not is_tuple(Head); tuple_size(Head) /=2 ->
+  {error, "Value must be a list of 2-tuples."};
+store(ServerRef, Key, Value) ->
+  gen_server:call(ServerRef, {store, Key, Value}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -60,7 +66,10 @@ store(_Name, _Key, _Value) ->
 %%--------------------------------------------------------------------
 -spec init(term()) -> {ok, term()} | {ok, term(), number()} | ignore | {stop, term()}.
 init(_Args) ->
-  {ok, replace_with_riak_pid}.
+  case riakc_pb_socket:start_link(env:riak_address(), 8087, [{connect_timeout, 1000}]) of
+    {ok, Riak_pid} -> {ok, Riak_pid};
+    _ -> {stop, link_failure}
+  end.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -78,8 +87,15 @@ init(_Args) ->
                    {stop, term(), term()}.
 handle_call(stop, _From, _State) ->
   {stop, normal, replace_stopped, down}; %% setting the server's internal state to down
-handle_call({store, _Key, _Values}, _From, _State) ->
-  {reply, stub, replace_new_state}.
+handle_call({store, Key, Value}, _From, Riak_pid) ->
+  Obj = riakc_obj:new(<<"package">>, term_to_binary(Key), term_to_binary(Value)),
+
+  case riakc_pb_socket:put(Riak_pid, Obj) of
+       ok ->
+      {reply, ok, Riak_pid};
+      Error ->
+      {stop, Error, down}
+  end.
 
 %%--------------------------------------------------------------------
 %% @private
