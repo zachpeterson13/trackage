@@ -7,7 +7,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start/3, stop/1, get/0, add/1]).
+-export([start_link/3, stop/1, get/1, add/2]).
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
          code_change/3]).
@@ -23,8 +23,8 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec start(atom(), atom(), atom()) -> {ok, pid()} | ignore | {error, term()}.
-start(Registration_type, Name, Args) ->
+-spec start_link(atom(), atom(), atom()) -> {ok, pid()} | ignore | {error, term()}.
+start_link(Registration_type, Name, Args) ->
   gen_server:start_link({Registration_type, Name}, ?MODULE, Args, []).
 
 %%--------------------------------------------------------------------
@@ -34,8 +34,8 @@ start(Registration_type, Name, Args) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec stop(Name :: atom()) -> {ok} | {error, term()}.
-stop(Name) ->
-  gen_server:call(Name, stop).
+stop(ServerRef) ->
+  gen_server:call(ServerRef, stop).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -43,8 +43,8 @@ stop(Name) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-get() ->
-  ok.
+get(ServerRef) ->
+  gen_server:call(ServerRef, get_next).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -52,8 +52,8 @@ get() ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-add(_To_add) ->
-  ok.
+add(ServerRef, To_add) ->
+  gen_server:call(ServerRef, {add, To_add}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -67,8 +67,8 @@ add(_To_add) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec init(term()) -> {ok, term()} | {ok, term(), number()} | ignore | {stop, term()}.
-init(_) ->
-  {ok, replace}.
+init(Args) ->
+  {ok, Args}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -76,7 +76,7 @@ init(_) ->
 %% Handling call messages
 %%
 %% @end
-%%--------------------------------------------------------------------
+%%--------------------%------------------------------------------------
 -spec handle_call(Request :: term(), From :: pid(), State :: term()) ->
                    {reply, term(), term()} |
                    {reply, term(), term(), integer()} |
@@ -86,10 +86,10 @@ init(_) ->
                    {stop, term(), term()}.
 handle_call(stop, _From, _State) ->
  {stop, normal, replace_stopped, down}; %% setting the server's internal state to down
-handle_call({add, _New_pid}, _From, State) ->
-  {reply, ok, State};
-handle_call(get_next, _From, State) ->
-  {reply, ok, State}.
+handle_call({add, New_pid}, _From, State) ->
+  {reply, ok, [New_pid | State]};
+handle_call(get_next, _From, [Head | Tail]) ->
+  {reply, Head, Tail ++ [Head]}.
 
 %%--------------------------------------------------------------------
 %% @private

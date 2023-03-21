@@ -8,11 +8,9 @@ init(Req0, Opts) ->
   
   #{<<"package_uuid">> := Pack, <<"holder_uuid">> := Holder, <<"time_stamp">> := Timestamp} = jsx:decode(Data),
 
-  Package_uuid = binary_to_list(Pack),
-  Holder_uuid = binary_to_list(Holder),
-
-  io:fwrite("Package: ~p~nHolder: ~p~nTime: ~p~n", [Package_uuid, Holder_uuid, Timestamp]),
-
+  % Package_uuid = binary_to_list(Pack),
+  % Holder_uuid = binary_to_list(Holder),
+  %
   % List = get_package:get(dsf, Package_uuid),
   % 
   % store_package:store(fdj, Package_uuid, [{Holder_uuid, Timestamp} | List]),
