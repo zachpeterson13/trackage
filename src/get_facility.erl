@@ -6,7 +6,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start/3, stop/1, get/2]).
+-export([start_link/3, stop/1, get/2]).
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
          code_change/3]).
@@ -26,8 +26,8 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec start(atom(), atom(), atom()) -> {ok, pid()} | ignore | {error, term()}.
-start(Registration_type, Name, Args) ->
+-spec start_link(atom(), atom(), atom()) -> {ok, pid()} | ignore | {error, term()}.
+start_link(Registration_type, Name, Args) ->
   gen_server:start_link({Registration_type, Name}, ?MODULE, Args, []).
 
 %%--------------------------------------------------------------------
@@ -40,8 +40,10 @@ start(Registration_type, Name, Args) ->
 stop(Name) ->
   gen_server:call(Name, stop).
 
-get(Name, Facility_uuid) ->
-  gen_server:call(Name, {get, Facility_uuid}).
+get(_, Vehicle_uuid) when is_list(Vehicle_uuid) == false; Vehicle_uuid == [] ->
+  {error, "Key must be a non-empty string."};
+get(ServerRef, Vehicle_uuid) ->
+  gen_server:call(ServerRef, {get, Vehicle_uuid}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -56,7 +58,10 @@ get(Name, Facility_uuid) ->
 %%--------------------------------------------------------------------
 -spec init(term()) -> {ok, term()} | {ok, term(), number()} | ignore | {stop, term()}.
 init([]) ->
-  {ok, replace_up}.
+  case riakc_pb_socket:start_link(env:riak_address(), 8087, [{connect_timeout, 1000}]) of
+    {ok, Riak_pid} -> {ok, Riak_pid};
+    _ -> {stop, link_failure}
+  end.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -74,8 +79,14 @@ init([]) ->
                    {stop, term(), term()}.
 handle_call(stop, _From, _State) ->
   {stop, normal, replace_stopped, down}; %% setting the server's internal state to down
-handle_call({get, _Key}, _From, Riak_pid) ->
-  {reply, stub, Riak_pid}.
+handle_call({get, Vehicle_uuid}, _From, Riak_pid) ->
+  case riakc_pb_socket:get(Riak_pid, <<"vehicle">>, term_to_binary(Vehicle_uuid)) of
+    {ok, Fetched} ->
+      {reply, binary_to_term(riakc_obj:get_value(Fetched)), Riak_pid};
+    {error, notfound} -> {reply, [], Riak_pid};
+    Error ->
+      {stop, Error, down}
+  end.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -170,7 +181,7 @@ handle_call_get_happy() ->
 handle_call_get_fetch_error() ->
   meck:expect(riakc_pb_socket, get, fun(_, _, _) -> {error, "Error message"} end),
 
-  Expected = {error, {error, "Error message"}, down},
+  Expected = {stop, {error, "Error message"}, down},
 
   Actual1 = get_facility:handle_call({get, "key1"}, some_from_pid, some_riak_pid),
 

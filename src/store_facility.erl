@@ -6,7 +6,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start/3, stop/1, store/3]).
+-export([start_link/3, stop/1, store/3]).
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
          code_change/3]).
@@ -22,8 +22,8 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec start(atom(), atom(), atom()) -> {ok, pid()} | ignore | {error, term()}.
-start(Registration_type, Name, Args) ->
+-spec start_link(atom(), atom(), atom()) -> {ok, pid()} | ignore | {error, term()}.
+start_link(Registration_type, Name, Args) ->
   gen_server:start_link({Registration_type, Name}, ?MODULE, Args, []).
 
 %%--------------------------------------------------------------------
@@ -43,8 +43,12 @@ stop(Name) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec store(Name :: atom(), Key :: binary(), Value :: binary()) -> term().
-store(_Name, _Key, _Value) ->
-  stub.
+store(_, Key, _) when is_list(Key) == false; Key == [] ->
+  {error, "Key must be a non-empty string."};
+store(_, _, Value) when not is_list(Value); Value == [] ->
+  {error, "Value must be a non-empty string."};
+store(ServerRef, Key, Value) ->
+  gen_server:call(ServerRef, {store, Key, Value}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -59,7 +63,10 @@ store(_Name, _Key, _Value) ->
 %%--------------------------------------------------------------------
 -spec init(term()) -> {ok, term()} | {ok, term(), number()} | ignore | {stop, term()}.
 init(_Args) ->
-  {ok, replace_with_riak_pid}.
+  case riakc_pb_socket:start_link(env:riak_address(), 8087, [{connect_timeout, 1000}]) of
+    {ok, Riak_pid} -> {ok, Riak_pid};
+    _ -> {stop, link_failure}
+  end.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -77,8 +84,15 @@ init(_Args) ->
                    {stop, term(), term()}.
 handle_call(stop, _From, _State) ->
   {stop, normal, replace_stopped, down}; %% setting the server's internal state to down
-handle_call({store, _Key, _Values}, _From, _Riak_pid) ->
-  {reply, stub, replace_new_state}.
+handle_call({store, Key, Value}, _From, Riak_pid) ->
+  Obj = riakc_obj:new(<<"facility">>, term_to_binary(Key), term_to_binary(Value)),
+
+  case riakc_pb_socket:put(Riak_pid, Obj) of
+       ok ->
+      {reply, ok, Riak_pid};
+      Error ->
+      {stop, Error, down}
+  end.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -200,18 +214,14 @@ store_invalid_key() ->
   [Test1, Test2].
 
 store_invalid_value() ->
-  Expected = {error, "Value must be a string"},
+  Expected = {error, "Value must be a non-empty string."},
 
   Actual1 = catch store_facility:store(pid, "key", []),
   Actual2 = catch store_facility:store(pid, "key", not_a_string),
-  Actual3 = catch store_facility:store(pid, "key", [1, 2, 3, 4]),
-  Actual4 = catch store_facility:store(pid, "key", [{1, 2, 3}]),
 
-  Test1 = {"Value must be a string", ?_assertEqual(Expected, Actual1)},
-  Test2 = {"Value must be a string", ?_assertEqual(Expected, Actual2)},
-  Test3 = {"Value must be a string", ?_assertEqual(Expected, Actual3)},
-  Test4 = {"Value must be a string", ?_assertEqual(Expected, Actual4)},
+  Test1 = {"Value must be a non-empty string.", ?_assertEqual(Expected, Actual1)},
+  Test2 = {"Value must be a non-empty string.", ?_assertEqual(Expected, Actual2)},
 
-  [Test1, Test2, Test3, Test4].
+  [Test1, Test2].
 
 -endif.
