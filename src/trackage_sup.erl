@@ -31,12 +31,13 @@ init([]) ->
       period => 1},
 
   Sp_sup = generate_spec(store_package_sup, supervisor, store_package_sup, []),
+  Sv_sup = generate_spec(store_vehicle_sup, supervisor, store_vehicle_sup, []),
   Sf_sup = generate_spec(store_facility_sup, supervisor, store_facility_sup, []),
   Gp_sup = generate_spec(get_package_sup, supervisor, get_package_sup, []),
   Gv_sup = generate_spec(get_vehicle_sup, supervisor, get_vehicle_sup, []),
   Gf_sup = generate_spec(get_facility_sup, supervisor, get_facility_sup, []),
 
-  ChildSpecs = [Sp_sup, Sf_sup, Gp_sup, Gv_sup, Gf_sup],
+  ChildSpecs = [Sp_sup, Sv_sup, Sf_sup, Gp_sup, Gv_sup, Gf_sup],
   {ok, {SupFlags, ChildSpecs}}.
 
 %% internal functions
