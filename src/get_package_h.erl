@@ -12,7 +12,7 @@ init(Req0, Opts) ->
 
   History_list = get_package:get(rr_distributor:get(get_package_rr), Package_uuid),
 
-  History_map = lists:map(fun({A, B}) -> #{<<"holder_uuid">> => term_to_binary(A), <<"time_stamp">> => B} end, History_list),
+  History_map = lists:map(fun({A, B}) -> #{<<"holder_uuid">> => binary:list_to_bin(A), <<"time_stamp">> => B} end, History_list),
 
   Reply = jsx:encode(#{<<"history">> => History_map}),
 
