@@ -14,7 +14,7 @@ init(Req0, Opts) ->
 
   History_map = lists:map(fun({A, B}) -> #{<<"holder_uuid">> => term_to_binary(A), <<"time_stamp">> => term_to_binary(B)} end, History_list),
 
-  Reply = binary_to_list(jsx:encode(#{<<"history">> => History_map})),
+  Reply = jsx:encode(#{<<"history">> => History_map}),
 
 	Req = cowboy_req:reply(200, #{
 		<<"content-type">> => <<"text/json">>
