@@ -12,7 +12,7 @@ init(Req0, Opts) ->
 
   List = get_package:get(rr_distributor:get(get_package_rr), Package_uuid),
 
-  Reply = jsx:encode(#{<<"history">> => List}),
+  Reply = binary_to_list(jsx:encode(#{<<"history">> => List})),
 
 	Req = cowboy_req:reply(200, #{
 		<<"content-type">> => <<"text/json">>
