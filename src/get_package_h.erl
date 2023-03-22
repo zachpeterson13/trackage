@@ -10,9 +10,11 @@ init(Req0, Opts) ->
 
   Package_uuid = binary_to_list(Pack),
 
-  List = get_package:get(rr_distributor:get(get_package_rr), Package_uuid),
+  History_list = get_package:get(rr_distributor:get(get_package_rr), Package_uuid),
 
-  Reply = binary_to_list(jsx:encode(#{<<"history">> => List})),
+  History_map = lists:map(fun({A, B}) -> #{<<"holder_uuid">> => term_to_binary(A), <<"time_stamp">> => term_to_binary(B)} end, History_list),
+
+  Reply = binary_to_list(jsx:encode(#{<<"history">> => History_map})),
 
 	Req = cowboy_req:reply(200, #{
 		<<"content-type">> => <<"text/json">>
