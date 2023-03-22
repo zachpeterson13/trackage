@@ -81,7 +81,7 @@ init([]) ->
 handle_call(stop, _From, _State) ->
   {stop, normal, replace_stopped, down}; %% setting the server's internal state to down
 handle_call({get, Package_uuid}, _From, Riak_pid) ->
-  case riakc_pb_socket:get(Riak_pid, <<"package">>, Package_uuid) of
+  case riakc_pb_socket:get(Riak_pid, <<"package">>, term_to_binary(Package_uuid)) of
     {ok, Fetched} ->
       {reply, binary_to_term(riakc_obj:get_value(Fetched)), Riak_pid};
     Error ->
