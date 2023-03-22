@@ -181,7 +181,7 @@ handle_call_get_happy() ->
 handle_call_get_fetch_error() ->
   meck:expect(riakc_pb_socket, get, fun(_, _, _) -> {error, "Error message"} end),
 
-  Expected = {stop, {error, "Error message"}, down},
+  Expected = {error, {error, "Error message"}, down},
 
   Actual1 = get_facility:handle_call({get, "key1"}, some_from_pid, some_riak_pid),
 
