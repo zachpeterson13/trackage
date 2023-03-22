@@ -38,11 +38,13 @@ start(Registration_type, Name, Args) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec stop(Name :: atom()) -> {ok} | {error, term()}.
-stop(Name) ->
-  gen_server:call(Name, stop).
+stop(ServerRef) ->
+  gen_server:call(ServerRef, stop).
 
-get(Name, Pkg_uuid) ->
-  gen_server:call(Name, {get, Pkg_uuid}).
+get(_, Package_uuid) when is_list(Package_uuid) == false; Package_uuid == [] ->
+  {error, "Key must be a non-empty string."};
+get(ServerRef, Package_uuid) ->
+  gen_server:call(ServerRef, {get, Package_uuid}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -57,7 +59,10 @@ get(Name, Pkg_uuid) ->
 %%--------------------------------------------------------------------
 -spec init(term()) -> {ok, term()} | {ok, term(), number()} | ignore | {stop, term()}.
 init([]) ->
-  {ok, replace_up}.
+  case riakc_pb_socket:start_link(env:riak_address(), 8087, [{connect_timeout, 1000}]) of
+    {ok, Riak_pid} -> {ok, Riak_pid};
+    _ -> {stop, link_failure}
+  end.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -75,8 +80,13 @@ init([]) ->
                    {stop, term(), term()}.
 handle_call(stop, _From, _State) ->
   {stop, normal, replace_stopped, down}; %% setting the server's internal state to down
-handle_call({get, _Key}, _From, Riak_pid) ->
-  {reply, stub, Riak_pid}.
+handle_call({get, Package_uuid}, _From, Riak_pid) ->
+  case riakc_pb_socket:get(Riak_pid, <<"package">>, Package_uuid) of
+    {ok, Fetched} ->
+      {reply, binary_to_term(riakc_obj:get_value(Fetched)), Riak_pid};
+    Error ->
+      {stop, Error, down}
+  end.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -171,7 +181,7 @@ handle_call_get_happy() ->
 handle_call_get_fetch_error() ->
   meck:expect(riakc_pb_socket, get, fun(_, _, _) -> {error, "Error message"} end),
 
-  Expected = {error, {error, "Error message"}, down},
+  Expected = {stop, {error, "Error message"}, down},
 
   Actual1 = get_package:handle_call({get, "key1"}, some_from_pid, some_riak_pid),
 
