@@ -11,9 +11,9 @@ init(Req0, Opts) ->
   Package_uuid = binary_to_list(Pack),
   Holder_uuid = binary_to_list(Holder),
 
-  List = get_package:get(dsf, Package_uuid),
+  List = get_package:get(rr_distributor:get(get_package_rr), Package_uuid),
 
-  store_package:store(fdj, Package_uuid, [{Holder_uuid, Timestamp} | List]),
+  store_package:store(rr_distributor:get(store_package_rr), Package_uuid, [{Holder_uuid, Timestamp} | List]),
 
 	Req = cowboy_req:reply(200, #{
 		<<"content-type">> => <<"text/json">>

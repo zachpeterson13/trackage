@@ -30,7 +30,10 @@ init([]) ->
       intensity => 0,
       period => 1},
 
-  ChildSpecs = [generate_spec(store_package_sup, supervisor, store_package_sup, [])],
+  Sp_sup = generate_spec(store_package_sup, supervisor, store_package_sup, []),
+  Gp_sup = generate_spec(get_package_sup, supervisor, get_package_sup, []),
+
+  ChildSpecs = [Sp_sup, Gp_sup],
   {ok, {SupFlags, ChildSpecs}}.
 
 %% internal functions

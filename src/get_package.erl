@@ -7,7 +7,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start/3, stop/1, get/2]).
+-export([start_link/3, stop/1, get/2]).
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
          code_change/3]).
@@ -27,8 +27,8 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec start(atom(), atom(), atom()) -> {ok, pid()} | ignore | {error, term()}.
-start(Registration_type, Name, Args) ->
+-spec start_link(atom(), atom(), atom()) -> {ok, pid()} | ignore | {error, term()}.
+start_link(Registration_type, Name, Args) ->
   gen_server:start_link({Registration_type, Name}, ?MODULE, Args, []).
 
 %%--------------------------------------------------------------------
