@@ -18,8 +18,8 @@ init(Req0, Opts) ->
     get_vehicle:get(
       rr_distributor:get(get_vehicle_rr), Vehicle_uuid),
 
-  store_package:store(
-    rr_distributor:get(store_package_rr), Vehicle_uuid, [{Lat, Long, Timestamp} | List]),
+  store_vehicle:store(
+    rr_distributor:get(store_vehicle_rr), Vehicle_uuid, [{Lat, Long, Timestamp} | List]),
 
   Req = cowboy_req:reply(200, #{<<"content-type">> => <<"text/json">>}, "[\"done\"]", Req0),
 
