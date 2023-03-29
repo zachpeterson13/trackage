@@ -69,7 +69,7 @@ init(_Start_info) ->
   %%
   %% define your supervisor specification here.
   SupFlags =
-    #{stategy => rest_for_one,
+    #{stategy => one_for_one,
       intensity => 5,
       period => 1},
 
