@@ -74,7 +74,8 @@ init(_Start_info) ->
       period => 1},
 
   %% generate your child specification list here.
-  Names = [list_to_atom("get_vehicle_" ++ integer_to_list(X)) || X <- lists:seq(0, 0)],
+  Names =
+    [list_to_atom("get_vehicle_" ++ integer_to_list(X)) || X <- lists:seq(0, env:gvcount())],
   ChildSpecList =
     [generate_spec(rr_distributor, worker, get_vehicle_rr, Names)
      | [generate_spec(get_vehicle, worker, X, []) || X <- Names]],
