@@ -86,7 +86,7 @@ handle_call({get, Package_uuid}, _From, Riak_pid) ->
       {reply, binary_to_term(riakc_obj:get_value(Fetched)), Riak_pid};
     {error, notfound} -> {reply, [], Riak_pid};
     Error ->
-      {stop, Error, down}
+      {stop, Error, Error, down}
   end.
 
 %%--------------------------------------------------------------------

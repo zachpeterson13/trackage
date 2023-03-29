@@ -91,7 +91,7 @@ handle_call({store, Key, Value}, _From, Riak_pid) ->
        ok ->
       {reply, ok, Riak_pid};
       Error ->
-      {stop, Error, down}
+      {stop, Error, Error, down}
   end.
 
 %%--------------------------------------------------------------------
