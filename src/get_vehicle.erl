@@ -48,7 +48,7 @@ stop(Name) ->
 get(_, Vehicle_uuid) when is_list(Vehicle_uuid) == false; Vehicle_uuid == [] ->
   {error, "Key must be a non-empty string."};
 get(ServerRef, Vehicle_uuid) ->
-  gen_server:call(ServerRef, {get, Vehicle_uuid}).
+  gen_server:call(ServerRef, {get, Vehicle_uuid}, infinity).
 
 %%%===================================================================
 %%% gen_server callbacks

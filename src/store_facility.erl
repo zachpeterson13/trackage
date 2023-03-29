@@ -48,7 +48,7 @@ store(_, Key, _) when is_list(Key) == false; Key == [] ->
 store(_, _, Value) when not is_list(Value); Value == [] ->
   {error, "Value must be a non-empty string."};
 store(ServerRef, Key, Value) ->
-  gen_server:call(ServerRef, {store, Key, Value}).
+  gen_server:call(ServerRef, {store, Key, Value}, infinity).
 
 %%%===================================================================
 %%% gen_server callbacks

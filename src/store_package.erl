@@ -51,7 +51,7 @@ store(_, _, Value) when Value == []; not is_list(Value) ->
 store(_, _, [Head | _]) when not is_tuple(Head); tuple_size(Head) /=2 ->
   {error, "Value must be a list of 2-tuples."};
 store(ServerRef, Key, Value) ->
-  gen_server:call(ServerRef, {store, Key, Value}).
+  gen_server:call(ServerRef, {store, Key, Value}, infinity).
 
 %%%===================================================================
 %%% gen_server callbacks

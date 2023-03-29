@@ -44,7 +44,7 @@ stop(ServerRef) ->
 get(_, Package_uuid) when is_list(Package_uuid) == false; Package_uuid == [] ->
   {error, "Key must be a non-empty string."};
 get(ServerRef, Package_uuid) ->
-  gen_server:call(ServerRef, {get, Package_uuid}).
+  gen_server:call(ServerRef, {get, Package_uuid}, infinity).
 
 %%%===================================================================
 %%% gen_server callbacks
