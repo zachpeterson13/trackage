@@ -12,7 +12,8 @@
 start(_StartType, _StartArgs) ->
   Dispatch =
     cowboy_router:compile([{'_',
-                            [{"/store_package_info", store_package_h, []},
+                            [{"/", toppage_h, []},
+                             {"/store_package_info", store_package_h, []},
                              {"/store_vehicle_info", store_vehicle_h, []},
                              {"/store_facility_info", store_facility_h, []},
                              {"/query_package_history", get_package_h, []},
